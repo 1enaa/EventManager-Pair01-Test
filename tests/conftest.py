@@ -6,7 +6,7 @@ def sample_event_dict():
     return {
         "title": "Cybersecurity Workshop",
         "description": "A workshop about cybersecurity.",
-        "date": "2026-11-15",
+        "date": "2099-11-15",
         "location": "Constantine",
         "capacity": 100,
     }
