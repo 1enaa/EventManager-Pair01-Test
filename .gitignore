@@ -13,3 +13,7 @@ events.db
 
 .vscode/
 .idea/
+.coverage
+events.db
+.pytest_cache/
+__pycache__/
