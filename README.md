@@ -274,3 +274,18 @@ The API can be explored interactively through Swagger UI:
 ```text
 http://127.0.0.1:8000/docs
 ```
+
+
+
+## Lab 3: Mutation Testing Results
+
+- Line coverage: 100% (required: 85%)
+- Mutation score: 100%, 206/206 mutants killed (required: 80%)
+
+![Mutation report](docs/mutation-report.png)
+## Lab 3: Mutation Testing Results
+
+- Line coverage: 100%
+- Mutation score: 100% (206/206 mutants killed)
+
+![Mutation report](docs/mutation-report.png)

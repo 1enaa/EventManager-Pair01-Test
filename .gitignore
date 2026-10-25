@@ -17,3 +17,8 @@ events.db
 events.db
 .pytest_cache/
 __pycache__/
+
+.mutmut-cache
+.mutmut-cache-backup
+html/
+htmlcov/
