@@ -1,12 +1,15 @@
-﻿"""Extra tests (beyond the lab's required files) covering the participants and
-registrations routers, database.get_db and main.py, using mocks only:
+﻿
+"""Extra tests covering participants and registrations routers,
+database.get_db and main.py, using mocks only:
 no live database and no HTTP calls."""
+
 import importlib
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.sql import operators
 
 from app.database import get_db
 from app.models import Event, Participant, Registration
@@ -29,14 +32,18 @@ def make_participant_db():
 
 
 def make_participant_model(**overrides):
-    data = {"id": 1, "name": "Amine", "email": "amine@example.com"}
+    data = {
+        "id": 1,
+        "name": "Amine",
+        "email": "amine@example.com",
+    }
     data.update(overrides)
     return Participant(**data)
 
 
 def test_create_participant_success(sample_participant_dict):
     db, query = make_participant_db()
-    query.first.return_value = None          # no existing email
+    query.first.return_value = None
     payload = ParticipantCreate(**sample_participant_dict)
 
     result = participant_routes.create_participant(payload, db)
@@ -63,7 +70,10 @@ def test_create_participant_duplicate_email(sample_participant_dict):
 
 def test_list_participants():
     db, query = make_participant_db()
-    expected = [make_participant_model(), make_participant_model(id=2, name="Sara")]
+    expected = [
+        make_participant_model(),
+        make_participant_model(id=2, name="Sara"),
+    ]
     query.all.return_value = expected
 
     result = participant_routes.list_participants(db)
@@ -113,12 +123,16 @@ def test_delete_missing_participant():
 
 
 # ======================================================================
-# REGISTRATIONS ROUTER
+# REGISTRATIONS ROUTER: HELPERS
 # ======================================================================
 
 def make_registration_db(event=None, participant=None, existing=None):
-    """Mocked session: db.query(Model) returns the object chosen per model."""
-    results = {Event: event, Participant: participant, Registration: existing}
+    """Return a mocked session with results selected by model."""
+    results = {
+        Event: event,
+        Participant: participant,
+        Registration: existing,
+    }
     db = MagicMock()
 
     def query(model):
@@ -131,16 +145,79 @@ def make_registration_db(event=None, participant=None, existing=None):
     return db
 
 
+def make_tracking_registration_db(event=None, participant=None, existing=None):
+    """Return a mocked session and retain query objects for assertions."""
+    results = {
+        Event: event,
+        Participant: participant,
+        Registration: existing,
+    }
+    queries = {}
+    db = MagicMock()
+
+    def query(model):
+        q = MagicMock()
+        q.filter.return_value = q
+        q.first.return_value = results[model]
+        queries[model] = q
+        return q
+
+    db.query.side_effect = query
+    return db, queries
+
+
 def make_event(registrations=None, capacity=10):
-    return SimpleNamespace(id=1, capacity=capacity, registrations=registrations or [])
+    return SimpleNamespace(
+        id=1,
+        capacity=capacity,
+        registrations=registrations or [],
+    )
 
 
 def make_simple_participant():
-    return SimpleNamespace(id=5, name="Amine", email="amine@example.com")
+    return SimpleNamespace(
+        id=5,
+        name="Amine",
+        email="amine@example.com",
+    )
 
+
+# ======================================================================
+# REGISTRATIONS ROUTER: CONFIGURATION
+# ======================================================================
+
+def test_registration_router_configuration_and_routes():
+    assert registration_routes.router is not None
+    assert registration_routes.router.prefix == "/events"
+    assert registration_routes.router.tags == ["Registrations"]
+
+    registered_routes = {
+        (route.path, method)
+        for route in registration_routes.router.routes
+        for method in getattr(route, "methods", set())
+    }
+
+    # FastAPI stores the full paths, including the router prefix.
+    assert (
+        "/events/{event_id}/register/{participant_id}",
+        "POST",
+    ) in registered_routes
+
+    assert (
+        "/events/{event_id}/participants",
+        "GET",
+    ) in registered_routes
+
+
+# ======================================================================
+# REGISTRATIONS ROUTER: REGISTER PARTICIPANT
+# ======================================================================
 
 def test_register_participant_success():
-    db = make_registration_db(event=make_event(), participant=make_simple_participant())
+    db = make_registration_db(
+        event=make_event(),
+        participant=make_simple_participant(),
+    )
 
     result = registration_routes.register_participant(1, 5, db)
 
@@ -163,7 +240,10 @@ def test_register_event_not_found():
 
 
 def test_register_participant_not_found():
-    db = make_registration_db(event=make_event(), participant=None)
+    db = make_registration_db(
+        event=make_event(),
+        participant=None,
+    )
 
     with pytest.raises(HTTPException) as exc:
         registration_routes.register_participant(1, 999, db)
@@ -189,8 +269,14 @@ def test_register_duplicate_registration():
 
 
 def test_register_event_full():
-    full_event = make_event(registrations=[object(), object()], capacity=2)
-    db = make_registration_db(event=full_event, participant=make_simple_participant())
+    event = make_event(
+        registrations=[object(), object()],
+        capacity=2,
+    )
+    db = make_registration_db(
+        event=event,
+        participant=make_simple_participant(),
+    )
 
     with pytest.raises(HTTPException) as exc:
         registration_routes.register_participant(1, 5, db)
@@ -201,23 +287,104 @@ def test_register_event_full():
 
 
 def test_register_last_free_seat():
-    # boundary: capacity 2 with 1 registered -> still allowed
     event = make_event(registrations=[object()], capacity=2)
-    db = make_registration_db(event=event, participant=make_simple_participant())
+    db = make_registration_db(
+        event=event,
+        participant=make_simple_participant(),
+    )
 
     result = registration_routes.register_participant(1, 5, db)
 
     assert result.participant_id == 5
+    db.add.assert_called_once()
     db.commit.assert_called_once()
 
 
+# ======================================================================
+# REGISTRATIONS ROUTER: FILTER OPERATOR MUTANTS
+# ======================================================================
+
+def test_register_event_filter_uses_equality():
+    db, queries = make_tracking_registration_db(
+        event=make_event(),
+        participant=make_simple_participant(),
+    )
+
+    registration_routes.register_participant(1, 5, db)
+
+    expression = queries[Event].filter.call_args.args[0]
+    assert expression.operator is operators.eq
+
+
+def test_register_participant_filter_uses_equality():
+    db, queries = make_tracking_registration_db(
+        event=make_event(),
+        participant=make_simple_participant(),
+    )
+
+    registration_routes.register_participant(1, 5, db)
+
+    expression = queries[Participant].filter.call_args.args[0]
+    assert expression.operator is operators.eq
+
+
+def test_duplicate_registration_filters_use_equality():
+    db, queries = make_tracking_registration_db(
+        event=make_event(),
+        participant=make_simple_participant(),
+    )
+
+    registration_routes.register_participant(1, 5, db)
+
+    expressions = queries[Registration].filter.call_args.args
+
+    assert len(expressions) == 2
+    assert all(
+        expression.operator is operators.eq
+        for expression in expressions
+    )
+
+
+# ======================================================================
+# REGISTRATIONS ROUTER: LIST EVENT PARTICIPANTS
+# ======================================================================
+
 def test_list_event_participants_success():
-    registrations = [SimpleNamespace(participant=make_simple_participant())]
-    db = make_registration_db(event=make_event(registrations=registrations))
+    registrations = [
+        SimpleNamespace(participant=make_simple_participant())
+    ]
+    db = make_registration_db(
+        event=make_event(registrations=registrations),
+    )
 
     result = registration_routes.list_event_participants(1, db)
 
-    assert result == [{"id": 5, "name": "Amine", "email": "amine@example.com"}]
+    assert result == [
+        {"id": 5, "name": "Amine", "email": "amine@example.com"}
+    ]
+
+
+def test_list_event_participants_multiple():
+    participant_one = make_simple_participant()
+    participant_two = SimpleNamespace(
+        id=6,
+        name="Sara",
+        email="sara@example.com",
+    )
+    registrations = [
+        SimpleNamespace(participant=participant_one),
+        SimpleNamespace(participant=participant_two),
+    ]
+    db = make_registration_db(
+        event=make_event(registrations=registrations),
+    )
+
+    result = registration_routes.list_event_participants(1, db)
+
+    assert result == [
+        {"id": 5, "name": "Amine", "email": "amine@example.com"},
+        {"id": 6, "name": "Sara", "email": "sara@example.com"},
+    ]
 
 
 def test_list_event_participants_empty():
@@ -233,10 +400,22 @@ def test_list_event_participants_event_not_found():
         registration_routes.list_event_participants(999, db)
 
     assert exc.value.status_code == 404
+    assert exc.value.detail == "Event not found."
+
+
+def test_list_event_participants_filter_uses_equality():
+    db, queries = make_tracking_registration_db(
+        event=make_event(),
+    )
+
+    registration_routes.list_event_participants(1, db)
+
+    expression = queries[Event].filter.call_args.args[0]
+    assert expression.operator is operators.eq
 
 
 # ======================================================================
-# DATABASE AND MAIN
+# DATABASE
 # ======================================================================
 
 def test_get_db_yields_session_and_closes_it():
@@ -247,17 +426,22 @@ def test_get_db_yields_session_and_closes_it():
         assert db is session_local.return_value
         db.close.assert_not_called()
 
-        gen.close()  # runs the `finally` block
+        gen.close()
 
         db.close.assert_called_once()
 
 
+# ======================================================================
+# MAIN APPLICATION
+# ======================================================================
+
 def test_main_app_setup_and_root_endpoint():
-    # create_all is patched so no real database/tables are touched
     with patch("sqlalchemy.MetaData.create_all") as create_all:
         import app.main as main
         importlib.reload(main)
 
     create_all.assert_called()
     assert main.app.title == "Event Manager API"
-    assert main.root() == {"message": "Welcome to Event Manager API"}
+    assert main.root() == {
+        "message": "Welcome to Event Manager API"
+    }
