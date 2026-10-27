@@ -1,3 +1,4 @@
+
 import pytest
 from pydantic import ValidationError
 
@@ -66,5 +67,4 @@ def test_duplicate_registration_raises():
 
 
 def test_new_registration_is_allowed():
-    # must not raise
     check_duplicate_registration([1, 2, 3], 4)
