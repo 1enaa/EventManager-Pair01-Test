@@ -1,0 +1,11 @@
+.venv
+__pycache__
+.mutmut-cache
+.mutmut-cache-backup
+html
+htmlcov
+mutants
+.git
+events.db
+tests
+docs
