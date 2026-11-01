@@ -67,6 +67,9 @@ def test_duplicate_registration_raises():
 
 
 def test_new_registration_is_allowed():
+
+    check_duplicate_registration([1, 2, 3], 4)
+
     check_duplicate_registration([1, 2, 3], 4)
 
 
@@ -367,3 +370,4 @@ def test_openapi_info(client):
     assert info["title"] == "Event Manager API"
     assert info["version"] == "1.0.0"
     assert info["description"] == "A teaching project for Git, Docker and CI/CD"
+

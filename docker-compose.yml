@@ -1,8 +1,9 @@
 services:
   web:
-    build: .
+    image: linasahour/eventmanager-api:v1
+    container_name: eventmanager-api-studentb
     ports:
-      - "8000:8000"
+      - "8002:8000"
     volumes:
       - events_sqlite_data:/app
 
