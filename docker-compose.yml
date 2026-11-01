@@ -9,4 +9,3 @@ services:
 
 volumes:
   events_sqlite_data:
-
