@@ -1,11 +1,18 @@
+version: '3.8'
 services:
-  web:
-    image: linasahour/eventmanager-api:v1
-    container_name: eventmanager-api-studentb
+  backend:
+    build: .
+    container_name: eventmanager_backend
     ports:
-      - "8002:8000"
+      - "8000:8000"
     volumes:
       - events_sqlite_data:/app
-
+  frontend:
+    build: ./frontend
+    container_name: eventmanager_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
 volumes:
   events_sqlite_data:
