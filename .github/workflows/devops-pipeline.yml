@@ -1,3 +1,4 @@
+
 name: Event Manager CI/CD Pipeline
 
 on:
@@ -69,3 +70,32 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/eventmanager-frontend:latest
+
+  deploy:
+    needs: [build-and-push-backend, build-and-push-frontend]
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check Kubernetes connection
+        run: |
+          kubectl config current-context
+          kubectl get nodes
+
+      - name: Dry-Run Kubernetes Manifests
+        run: kubectl apply --dry-run=client -f k8s/
+
+      - name: Apply Kubernetes Manifests
+        run: kubectl apply -f k8s/
+
+      - name: Restart Deployments
+        run: |
+          kubectl rollout restart deployment/backend-deployment
+          kubectl rollout restart deployment/frontend-deployment
+
+      - name: Verify Deployments
+        run: |
+          kubectl rollout status deployment/backend-deployment
+          kubectl rollout status deployment/frontend-deployment
