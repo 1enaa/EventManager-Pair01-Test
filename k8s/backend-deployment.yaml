@@ -1,0 +1,54 @@
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: backend-deployment
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: backend
+
+  template:
+    metadata:
+      labels:
+        app: backend
+
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: backend
+          image: linasahour/eventmanager-backend:latest
+
+          ports:
+            - containerPort: 8000
+
+          livenessProbe:
+            httpGet:
+              path: /events/
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /events/
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+
+          volumeMounts:
+            - name: sqlite-storage
+              mountPath: /app
+
+      volumes:
+        - name: sqlite-storage
+          persistentVolumeClaim:
+            claimName: sqlite-pvc
