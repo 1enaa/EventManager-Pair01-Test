@@ -1,5 +1,4 @@
-
-resource "kubernetes_deployment" "frontend" {
+resource "kubernetes_deployment" "frontend-deployment" {
   metadata {
     name = "frontend-deployment"
 
@@ -35,7 +34,7 @@ resource "kubernetes_deployment" "frontend" {
 
           env {
             name  = "VITE_API_BASE_URL"
-            value = "http://${var.laptop_a_ip}:8000"
+            value = var.api_base_url
           }
 
           security_context {
@@ -60,7 +59,7 @@ resource "kubernetes_deployment" "frontend" {
   }
 }
 
-resource "kubernetes_service" "frontend" {
+resource "kubernetes_service" "frontend-service" {
   metadata {
     name = "frontend-service"
   }

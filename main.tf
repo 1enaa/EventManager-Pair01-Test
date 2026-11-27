@@ -19,5 +19,5 @@ module "frontend" {
   source = "./modules/frontend"
 
   frontend_image = "${var.docker_username}/eventmanager-frontend:latest"
-  laptop_a_ip    = var.laptop_a_ip
+  api_base_url   = var.api_base_url
 }

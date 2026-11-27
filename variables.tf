@@ -3,7 +3,6 @@ variable "docker_username" {
   default = "linasahour"
 }
 
-variable "laptop_a_ip" {
-  type    = string
-  default = ""
+variable "api_base_url" {
+  type = string
 }
