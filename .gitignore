@@ -23,3 +23,12 @@ __pycache__/
 html/
 htmlcov/
 actions-runner/
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfstate.backup
+crash.log
+crash.*.log
