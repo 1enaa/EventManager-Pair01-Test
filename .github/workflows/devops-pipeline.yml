@@ -1,101 +1,27 @@
-
-name: Event Manager CI/CD Pipeline
-
+﻿name: devops-pipeline
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches: [main]
+
+env:
+  TF_VAR_docker_username: ${{ secrets.DOCKER_HUB_USERNAME }}
 
 jobs:
-  test:
+  lint-and-sec:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
+      - uses: aquasecurity/tfsec-action@v1.0.3
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run Unit & Integration Tests
-        run: pytest
-
-  build-and-push-backend:
-    needs: test
-    runs-on: ubuntu-latest
+  deploy-backend:
+    needs: lint-and-sec
     if: github.ref == 'refs/heads/main'
-
+    runs-on: [self-hosted, backend-server]
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-
-      - name: Build & Push Backend Image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/eventmanager-backend:latest
-
-  build-and-push-frontend:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-
-      - name: Build & Push Frontend Image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/eventmanager-frontend:latest
-
-  deploy:
-    needs: [build-and-push-backend, build-and-push-frontend]
-    runs-on: self-hosted
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Check Kubernetes connection
-        run: |
-          kubectl config current-context
-          kubectl get nodes
-
-      - name: Dry-Run Kubernetes Manifests
-        run: kubectl apply --dry-run=client -f k8s/
-
-      - name: Apply Kubernetes Manifests
-        run: kubectl apply -f k8s/
-
-      - name: Restart Deployments
-        run: |
-          kubectl rollout restart deployment/backend-deployment
-          kubectl rollout restart deployment/frontend-deployment
-
-      - name: Verify Deployments
-        run: |
-          kubectl rollout status deployment/backend-deployment
-          kubectl rollout status deployment/frontend-deployment
+      - uses: actions/checkout@v4
+      - run: terraform init
+      - run: terraform apply -auto-approve -target=module.backend
