@@ -24,6 +24,8 @@ jobs:
     runs-on: [self-hosted, backend-server]
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: false
       - run: terraform init
       - run: terraform apply -auto-approve '-target=module.backend'
 
@@ -33,5 +35,7 @@ jobs:
     runs-on: [self-hosted, frontend-server]
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: false
       - run: terraform init
       - run: terraform apply -auto-approve '-target=module.frontend'
