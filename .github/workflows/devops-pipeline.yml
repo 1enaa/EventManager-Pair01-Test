@@ -1,10 +1,11 @@
-﻿name: devops-pipeline
+name: devops-pipeline
 on:
   push:
     branches: [main]
 
 env:
   TF_VAR_docker_username: ${{ secrets.DOCKER_HUB_USERNAME }}
+  TF_VAR_api_base_url: ${{ vars.BACKEND_URL }}
 
 jobs:
   lint-and-sec:
@@ -26,3 +27,11 @@ jobs:
       - run: terraform init
       - run: terraform apply -auto-approve '-target=module.backend'
 
+  deploy-frontend:
+    needs: lint-and-sec
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, frontend-server]
+    steps:
+      - uses: actions/checkout@v4
+      - run: terraform init
+      - run: terraform apply -auto-approve '-target=module.frontend'
